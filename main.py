@@ -6,7 +6,11 @@ import asyncio
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from flask import Flask
+import threading
+
 load_dotenv()
+
 # Настройка логирования
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -14,8 +18,19 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Токен бота (ЗАМЕНИТЕ НА ВАШ ТОКЕН)
+# Токен бота
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
+
+# Flask app для health checks
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Telegram Bot is running!"
+
+@app.route('/health')
+def health():
+    return "OK"
 
 # Данные о номерах с флагами
 NUMBERS_DATA = {
@@ -228,8 +243,13 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "🤖 *Бот для покупки виртуальных номеров*\n\n"
     )
 
-def main() -> None:
-    """Запуск бота"""
+def run_flask():
+    """Запуск Flask сервера"""
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
+
+def run_bot():
+    """Запуск Telegram бота"""
     # Создаем приложение
     application = Application.builder().token(BOT_TOKEN).build()
     
@@ -242,6 +262,15 @@ def main() -> None:
     # Запускаем бота
     print("Бот запущен...")
     application.run_polling()
+
+def main() -> None:
+    """Основная функция запуска"""
+    # Запускаем Flask в отдельном потоке
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+    
+    # Запускаем бота в основном потоке
+    run_bot()
 
 if __name__ == "__main__":
     main()
